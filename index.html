@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 Taiwan International USR PBL Syllabus</title>
+  <style>
+    /* （此處維持之前的政大藍金質感 CSS 樣式，為節省版面在此省略，請沿用上一版的 <style> 內容） */
+    :root { --primary-blue: #0A2540; --accent-gold: #B39256; --light-bg: #F4F6F9; --card-bg: #FFFFFF; --text-color: #333333; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--light-bg); color: var(--text-color); margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-blue); padding-bottom: 15px; margin-bottom: 20px; }
+    h1 { color: var(--primary-blue); margin: 0; font-size: 24px; }
+    .controls button { background-color: var(--primary-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+    .controls button:hover { background-color: var(--accent-gold); }
+    .tabs-container { display: flex; overflow-x: auto; gap: 8px; margin-bottom: 25px; padding-bottom: 5px; }
+    .tab-btn { background-color: #E2E8F0; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: 0.3s; font-weight: 500; }
+    .tab-btn.active { background-color: var(--primary-blue); color: white; }
+    .timeline { position: relative; padding-left: 20px; }
+    .timeline::before { content: ''; position: absolute; left: 5px; top: 10px; bottom: 10px; width: 3px; background: linear-gradient(to bottom, var(--primary-blue), var(--accent-gold)); }
+    .timeline-item { position: relative; margin-bottom: 25px; background: #FFF; padding: 15px 20px; border-radius: 8px; border-left: 4px solid var(--primary-blue); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    .timeline-item::after { content: ''; position: absolute; left: -21px; top: 22px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-gold); border: 2px solid white; }
+    .time-badge { font-weight: bold; color: var(--primary-blue); font-size: 15px; margin-bottom: 5px; }
+    .event-title { font-size: 18px; font-weight: bold; color: #111; margin: 5px 0; }
+    .meta-info { font-size: 13px; color: #666; margin-bottom: 10px; .meta-info span { margin-right: 15px; } }
+    .detail-text { font-size: 14px; line-height: 1.6; color: #444; background: #F8FAFC; padding: 10px; border-radius: 6px; white-space: pre-line; }
+    #print-table-view { display: none; }
+    @media print {
+      body { background: white; color: black; padding: 0; }
+      .container { box-shadow: none; padding: 0; max-width: 100%; }
+      .header, .tabs-container, #timeline-view { display: none !important; }
+      #print-table-view { display: block !important; }
+      .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+      th, td { border: 1px solid #DDDDDD; padding: 10px; text-align: left; font-size: 13px; vertical-align: top; }
+      th { background-color: #F2F2F2; font-weight: bold; }
+      .print-event { font-weight: bold; margin-bottom: 4px; }
+      .print-detail { font-size: 12px; color: #333; white-space: pre-line; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1 id="page-title">Loading Itinerary...</h1>
+    <div class="controls">
+      <button onclick="toggleLanguage()" id="lang-btn">English</button>
+      <button onclick="window.print()">列印 / Print</button>
+    </div>
+  </div>
+  <div class="tabs-container" id="tabs-bar"></div>
+  <div id="timeline-view" class="timeline"></div>
+
+  <div id="print-table-view">
+    <div class="print-header">
+      <h2 style="margin:0;">Taiwan International USR Project Based Learning</h2>
+      <p style="margin:5px 0 0 0;">University Neighborhood Regeneration | Course Schedule</p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 10%;">Day/Date</th>
+          <th style="width: 15%;">Time</th>
+          <th style="width: 25%;">Instructor / Location</th>
+          <th style="width: 50%;">Topic & Details</th>
+        </tr>
+      </thead>
+      <tbody id="print-table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // 💡 【重要設定】：請在此處填入你剛剛在「第一步」中，重新部署產出的政大 GAS API 網址！
+  const API_URL = "https://script.google.com/macros/s/AKfycbwzzoiW6bEu-g3O4GgHJIq5jNxjVpdRw0WPSo4_k-2vz8Cs5BZ96VsTrFZoJGRVmTFwOw/exec"; 
+
+  let masterData = [];
+  let currentLang = 'zh'; 
+  let currentDay = 'Day 1';
+
+  // 改回外網 Fetch 模式
+  async function fetchData() {
+    try {
+      const response = await fetch(API_URL);
+      masterData = await response.json();
+      initUI();
+    } catch (error) {
+      document.getElementById('page-title').innerText = "讀取資料失敗 (Error loading data)...";
+      console.error(error);
+    }
+  }
+
+  function initUI() {
+    const days = [...new Set(masterData.map(item => item.day))];
+    const tabsBar = document.getElementById('tabs-bar');
+    tabsBar.innerHTML = '';
+    days.forEach((day) => {
+      const btn = document.createElement('button');
+      btn.className = `tab-btn ${day === currentDay ? 'active' : ''}`;
+      const dateSample = masterData.find(item => item.day === day)?.date || '';
+      btn.innerText = `${day} (${dateSample})`;
+      btn.onclick = () => switchDay(day);
+      tabsBar.appendChild(btn);
+    });
+    renderTimeline();
+    renderPrintTable();
+  }
+
+  function switchDay(day) {
+    currentDay = day;
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.innerText.includes(day));
+    });
+    renderTimeline();
+  }
+
+  function toggleLanguage() {
+    currentLang = currentLang === 'zh' ? 'en' : 'zh';
+    document.getElementById('lang-btn').innerText = currentLang === 'zh' ? 'English' : '中文';
+    renderTimeline();
+  }
+
+  function renderTimeline() {
+    const timeline = document.getElementById('timeline-view');
+    timeline.innerHTML = '';
+    document.getElementById('page-title').innerText = currentLang === 'zh' ? "2026 國際 PBL 課程日程表" : "2026 International PBL Program Itinerary";
+    const filtered = masterData.filter(item => item.day === currentDay);
+    filtered.forEach(item => {
+      const eventText = currentLang === 'zh' ? item.event_cn : (item.event_en || item.event_cn);
+      const detailText = currentLang === 'zh' ? item.detail_cn : (item.detail_en || item.detail_cn);
+      const hostText = currentLang === 'zh' ? item.host_cn : (item.host_en || item.host_cn);
+      const locText = currentLang === 'zh' ? item.location_cn : (item.location_en || item.location_cn);
+      const itemHtml = `
+        <div class="timeline-item">
+          <div class="time-badge">${item.time_slot}</div>
+          <div class="event-title">${eventText}</div>
+          <div class="meta-info"><span>👤 ${hostText}</span><span>📍 ${locText}</span></div>
+          <div class="detail-text">${detailText}</div>
+        </div>
+      `;
+      timeline.innerHTML += itemHtml;
+    });
+  }
+
+  function renderPrintTable() {
+    const tableBody = document.getElementById('print-table-body');
+    tableBody.innerHTML = '';
+    masterData.forEach(item => {
+      const rowHtml = `
+        <tr>
+          <td><b>${item.day}</b><br><small>${item.date}</small></td>
+          <td>${item.time_slot}</td>
+          <td><b>CN:</b> ${item.host_cn}<br>📍 ${item.location_cn}<br><br><b>EN:</b> ${item.host_en || '-'}<br>📍 ${item.location_en || '-'}</td>
+          <td><div class="print-event">${item.event_cn} / ${item.event_en || ''}</div><div class="print-detail">${item.detail_cn}</div></td>
+        </tr>
+      `;
+      tableBody.innerHTML += rowHtml;
+    });
+  }
+
+  fetchData();
+</script>
+</body>
+</html>
